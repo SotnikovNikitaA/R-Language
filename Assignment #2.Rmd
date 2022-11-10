@@ -1,0 +1,116 @@
+---
+title: "Assignment 2"
+author: "Nikita Sotnikov"
+date: "25 01 2021"
+output: html_document
+---
+
+#Question 1
+X1=GPA 
+X2=IQ 
+X3=Gender(1 for Female and 0 for Male) 
+X4=Interaction between GPA and IQ
+X5=Interaction between GPA and Gender.
+Multi-regression: 
+y=50+20X1+0.07X2+35X3+0.01X4-10X5
+Male regression:
+y=50+20X1+0.07X2+35(0)+0.01X4-10(0)
+y=50+20X1+0.07X2+0.01X4
+Female regression:
+y=50+20X1+0.07X2+35(1)+0.01X4-10X5
+y=85+20X1+0.07X2+0.01X4-10X5
+a) Correct:3
+For a fixed value of IQ and GPA, males earn more on average than females provided that the GPA is high enough.
+b) If X3=1, X1=4, X2=110
+```{r}
+y=85+20*4+0.07*110+0.01*(4*110)-10*(4*1)
+```
+y=137.1
+c) False, shouldn't forget about the standard error of beta estimates and how it dependent on it
+
+#Question 2
+```{r}
+House=read.csv("kc house sales.csv")
+House$date=as.Date(House$date,format="%Y%m%d")
+House$view=as.factor(House$view)
+House$waterfront=as.factor(House$waterfront)
+House$zipcode=as.factor(House$zipcode)
+House[15871,3]=3
+attach(House)
+```
+#Question 3
+```{r}
+NS=lm(price~sqft_living)
+summary(NS)
+```
+#Question 4
+## linear positive relationships, R-squared almost 50% so it is moderate relationship
+#Question 5
+```{r}
+plot(sqft_living,price)
+abline(NS,lwd=3,col=5)
+```
+#Question 6
+```{r}
+plot(NS)
+#First plot is non-linear what is good, Second plot is close to line but tail is screwed so it is not good for model and has strong violation,third plot shows a heteroscedasticity what is not good, on 4-th plot we have several outliers and one high-leverage point.
+```
+#Question 7
+```{r}
+hist(price)
+hist(log(price))
+#On the first histogram, the data are distributed in descending order, in turn, after the transformation, the data became normal.
+```
+#Question 8
+```{r}
+NS2=lm(log(price)~sqft_living)
+plot(NS2)
+#After transformation the first plot has some linear pattern, second plot became linear what is good, third plot almost have homoscedasticity what is also good, and 4-th plot have a few outliers.
+```
+#Question 9
+```{r}
+confint(NS2)
+confint(NS2, level=.95)
+predict(NS2, data.frame(sqft_living=2000),interval="confidence")
+predict(NS2, data.frame(sqft_living=2000),interval="prediction")
+```
+#Question 10
+```{r}
+NS3=lm(log(price)~.,data=House)
+summary(NS3)
+```
+#Question 11
+```{r}
+#Some of the variables are undefined because the singularity means the variables are not linearly independent. If you remove the variables that give NA in the above summary, you get the same result for the rest of the variables. This is because the information provided by these variables is already contained in other variables and is therefore redundant.
+```
+
+
+#Question 12
+```{r}
+NS4=lm(log(price)~(.-sqft_basement),data=House)
+plot(NS4)
+#The first plot now have a linear pattern, second plot have a weak violation, third plot has a homoscedasticity, 4-th plot has one outlier and several high leverage points
+```
+#Question 13
+```{r}
+library(car)
+vif(NS4)
+#almost all coefficients close to 1 what is good, but a two have high than 5 so can make some problem.
+```
+#Question 14
+```{r}
+acf(NS4$residuals)
+pacf(NS4$residuals)
+# No strong violation, neither significant value.
+```
+
+#Question 15
+```{r}
+interaction.fit=lm(log(price)~(. -sqft_basement -zipcode)^2+zipcode, House)
+options(max.print=10000)
+summary(interaction.fit)
+```
+#Question 16
+```{r}
+# Yes, it is better ther is more significant value and also, previours R^2 was 0.8799, and now it is 0.8937 that bigger,and has 11.4 of the unexplained variation what is good. So it is much better with interaction.
+```

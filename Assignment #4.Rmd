@@ -1,0 +1,179 @@
+---
+title: "Assignment 4"
+author: "Nikita Sotnikov"
+date: "19 02 2021"
+output: html_document
+---
+
+#1
+```{r}
+House=read.csv("kc house sales.csv")
+House$date=as.Date(House$date,format="%Y%m%d")
+House$view=as.factor(House$view)
+House$waterfront=as.factor(House$waterfront)
+House$zipcode=as.factor(House$zipcode)
+House[15871,3]=3
+attach(House)
+```
+
+#2
+```{r}
+house.glm=glm(log(price)~.-sqft_basement,data=House,family=gaussian)
+```
+
+#3
+```{r}
+library(boot)
+set.seed(100)
+house.cvglm=cv.glm(House,house.glm, K=10)
+names(house.cvglm)
+house.cvglm$delta
+```
+#4
+```{r}
+house.glm2=glm(log(price)~(.-sqft_basement-zipcode)^2+zipcode,House,family=gaussian)
+```
+
+#5
+```{r warning=FALSE}
+set.seed(100)
+house.cvglm2=cv.glm(House, house.glm2, K=10)
+names(house.cvglm2)
+house.cvglm2$delta
+
+```
+#6
+```{r}
+#Yes, the difference between two models practically significant.
+exp(house.cvglm$delta)
+exp(house.cvglm2$delta)
+#Even after convert the difference still significant and second model still better.
+```
+#7
+```{r}
+Bank=read.csv("bank marketing.csv")
+Bank$y=as.factor(Bank$y)
+attach(Bank)
+```
+
+#8
+```{r}
+Bank.fit=glm(y~. -duration, data=Bank, family=binomial)
+```
+
+#9
+```{r warning=FALSE}
+set.seed(200)
+cost=costfunction=function(r, pi){
+err1=ifelse(r==1 & pi<0.5, 1, 0) 
+err0=ifelse(r==0 & pi>0.5, 1, 0)
+return(mean(err1+err0))
+}
+Bank.cvglm=cv.glm(Bank, Bank.fit, K=10)
+Bank.cvglm$delta
+```
+
+#10
+```{r warning=FALSE}
+set.seed(10)
+Bank2=Bank[sample(nrow(Bank)),]
+k=10
+bank.prob=rep(0,nrow(Bank))
+bank.pred=rep("no", nrow(Bank))
+folds=rep(1:k, length=nrow(Bank))
+
+for(i in 1:k){
+fold = which(folds == i)
+bank.fit=glm(y~. -duration, data=Bank[-fold,], family=binomial)
+bank.prob[fold]=predict(bank.fit, newdata=Bank[fold,], type="response")
+bank.pred[fold]=ifelse(bank.prob[fold]>0.5, "yes","no")}
+```
+
+#11
+```{r warning=FALSE}
+table(bank.pred,Bank$y)
+cv.err=sum(Bank$y!=bank.pred)/nrow(Bank)
+cv.err
+#No, this test error rate is larger then in question 9, what is not good.
+```
+
+#12
+```{r}
+library(ROCR)
+
+rocplot=function(pred, truth, ...){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "tpr", "fpr")
+  plot(perf,...)}
+
+rocplot(bank.prob, Bank$y)
+
+auc=function(pred, truth){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "auc")
+  return(perf@y.values[[1]])}
+
+auc(bank.prob, Bank$y)
+
+```
+
+#13
+```{r warning=FALSE}
+library(MASS)
+bank.lda=lda(y~. -duration,data=Bank, CV=T)
+names(bank.lda)
+```
+#14
+```{r}
+table(bank.lda$class,y)
+sum(bank.lda$class!=y)/nrow(Bank)
+```
+
+#15
+```{r}
+na.obs=which(is.na(bank.lda$posterior[, 2]))
+length(na.obs)
+rocplot(bank.lda$posterior[-na.obs, 2], y[-na.obs])
+auc(bank.lda$posterior[-na.obs, 2], y[-na.obs])
+```
+
+#16
+```{r}
+bank.qda=qda(y~.-duration-default-loan, data=Bank, CV=T)
+names(bank.qda)
+```
+
+#17
+```{r}
+na.obs.qda=which(is.na(bank.qda$class))
+table(bank.qda$class[-na.obs.qda], y[-na.obs.qda])
+sum(bank.qda$class[-na.obs.qda]!=y[-na.obs.qda])/nrow(Bank[-na.obs.qda])
+```
+#18
+```{r}
+na.obs.qda=which(is.na(bank.qda$posterior[, 2]))
+length(na.obs.qda)
+rocplot(bank.qda$posterior[-na.obs.qda, 2], y[-na.obs.qda])
+auc(bank.qda$posterior[-na.obs.qda, 2], y[-na.obs.qda])
+```
+
+#19
+```{r}
+rocplot(bank.prob, Bank$y, col="red")
+legend(x=0.67, y=0.24,legend="logistic",col="red",lwd=1,bty="n")
+auc.log=auc(bank.prob, Bank$y)
+legend(x=0.85, y=0.24,legend=round(auc.log,5),bty="n")
+
+rocplot(bank.lda$posterior[-na.obs, 2], y[-na.obs], col="blue", add=T)
+legend(x=0.67, y=0.17,legend="LDA",col="blue",lwd=1,bty="n")
+auc.lda=auc(bank.lda$posterior[-na.obs, 2], y[-na.obs])
+legend(x=0.85, y=0.17,legend=round(auc.lda,5),bty="n")
+
+rocplot(bank.qda$posterior[-na.obs.qda, 2], y[-na.obs.qda],col="green", add=T)
+legend(x=0.67, y=0.1,legend="QDA",col="green",lwd=1,bty="n")
+auc.qda=auc(bank.qda$posterior[-na.obs.qda, 2], y[-na.obs.qda])
+legend(x=0.85, y=0.1,legend=round(auc.qda,5),bty="n")
+
+# The logistic model is best because has a larger AUC, second LDA and last QDA.
+```
+

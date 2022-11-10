@@ -1,0 +1,207 @@
+---
+title: 'Assignment #6'
+author: "Nikita Sotnikov"
+date: "01 03 2021"
+output: html_document
+---
+
+Question #1
+```{r}
+Bank=read.csv("bank marketing.csv")
+library(dplyr)
+Bank=mutate_if(Bank, is.character, as.factor)
+attach(Bank)
+```
+
+Question #2
+```{r}
+library(tree)
+set.seed(10)
+train=sample(nrow(Bank),nrow(Bank)/2)
+bank.tree=tree(y~.-duration,data=Bank[train,])
+plot(bank.tree)
+text(bank.tree, cex=0.7)
+```
+
+Question #3
+```{r}
+bank.tree=tree(y~.-duration,data=Bank[train,],control=tree.control(nobs=nrow(Bank)/2, mindev=0.005))
+plot(bank.tree)
+text(bank.tree, cex=0.7)
+# Yes, The number of nodes increased because we reduced the minimum allowed split size using the control argument.
+```
+
+Question #4
+```{r}
+set.seed(11)
+cvout=cv.tree(bank.tree)
+names(cvout) #6 size
+cvout
+plot(cvout$size,cvout$dev,type="b")
+mindev=which.min(cvout$dev)
+minsize=cvout$size[mindev]
+points(minsize,cvout$dev[mindev],pch=4,cex=2,col=2)
+bank.pruned=prune.tree(bank.tree,best=minsize)
+plot(bank.pruned)
+text(bank.pruned)
+bank.pruned
+```
+
+Question #5
+```{r}
+bank.pred=predict(bank.pruned,Bank[-train,],type="class")
+table(bank.pred,y[-train])
+sum(bank.pred!=y[-train])/length(y[-train])
+```
+
+Question #6
+```{r}
+bank.prob=predict(bank.pruned,Bank[-train,])
+
+library(ROCR)
+rocplot=function(pred, truth, ...){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "tpr", "fpr")
+  plot(perf,...)}
+
+rocplot(bank.prob[,2],y[-train], col="blue")
+
+legend(x=0.65, y=0.1,legend="tree",col="blue",lwd=1, bty="n")
+
+auc=function(pred, truth){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "auc")
+  return(perf@y.values[[1]])}
+
+auc.tree=auc(bank.prob[,2],y[-train])
+
+legend(x=0.85, y=0.1,legend=round(auc.tree,4),bty="n")
+```
+
+Question #7
+```{r}
+library(randomForest)
+set.seed(300)
+
+bank.bag=randomForest(y~.-duration,data=Bank,importance=T)
+
+bank.bag
+
+varImpPlot(bank.bag)
+
+```
+
+Question #8
+```{r}
+rocplot(-bank.bag$votes[1:nrow(Bank)],y, col="red")
+legend(x=0.62, y=0.18,legend="bagging",col="red",lwd=1, bty="n")
+auc.bag=auc(-bank.bag$votes[1:nrow(Bank)],y)
+legend(x=0.85, y=0.18,legend=round(auc.bag,4),bty="n")
+```
+
+Question #9
+```{r}
+set.seed(300)
+
+bank.bag=randomForest(y~.-duration,data=Bank,mtry=4, importance=T)
+bank.bag
+varImpPlot(bank.bag)
+
+rocplot(-bank.bag$votes[1:nrow(Bank)],y, col="red")
+legend(x=0.62, y=0.18,legend="bagging",col="red",lwd=1, bty="n")
+auc.bag=auc(-bank.bag$votes[1:nrow(Bank)],y)
+legend(x=0.85, y=0.18,legend=round(auc.bag,4),bty="n")
+```
+
+Question #10
+```{r}
+library(gbm)
+y01=ifelse(y=="yes",1,0)
+set.seed(300)
+bank.gbm=gbm(y01~.-duration-y, Bank, distribution="bernoulli", n.trees=7000, interaction.depth=2, shrinkage=0.01, cv.fold=5)
+
+names(bank.gbm)
+plot(bank.gbm$cv.error)
+plot(bank.gbm$cv.error[500:5493])
+min.tree=which.min(bank.gbm$cv.error)
+min.tree
+bank.gbm$cv.error[min.tree]
+summary(bank.gbm,n.trees=min.tree,las=1)
+```
+
+Question #11
+```{r}
+y01.pred=ifelse(bank.gbm$cv.fitted>0,1,0)
+table(y01,y01.pred)
+sum(y01.pred!=y01)/nrow(Bank)
+```
+
+Question #12
+```{r}
+rocplot(bank.gbm$cv.fitted,y)
+
+legend(x=0.62, y=0.34,legend="boosting",col="black",lwd=1, bty="n")
+
+auc.boosting.cv=auc(bank.gbm$cv.fitted,y)
+
+legend(x=0.85, y=0.34,legend=round(auc.boosting.cv,4),bty="n")
+```
+
+Question #13
+```{r}
+#Boosting method is best, because has largest auc.
+```
+
+Question #14
+```{r}
+House=read.csv("kc house sales.csv")
+House$date=as.Date(House$date,format="%Y%m%d")
+House$view=as.factor(House$view)
+House$waterfront=as.factor(House$waterfront)
+House$zipcode=as.factor(House$zipcode)
+House[15871,3]=3
+```
+
+Question #15
+```{r}
+House$days=as.numeric(House$date-as.Date("2014-05-01"))
+House=House[,-1]
+attach(House)
+```
+
+Question #16
+```{r}
+house.gbm=gbm(log(price)~., House, distribution="gaussian", n.trees=70000, interaction.depth=2, shrinkage=0.01, cv.fold=5)
+```
+
+Question #17
+```{r}
+plot(house.gbm$cv.error)
+min.tree=which.min(house.gbm$cv.error)
+min.tree
+house.gbm$cv.error[min.tree]
+plot(house.gbm$cv.error[30000:70000])
+#Yes, it shows minimum point clearly enough
+```
+
+Question #18
+```{r}
+train=sample(nrow(House),nrow(House)/2)
+log.sal.pred=predict(house.gbm,House[-train,])
+mse=mean((log(price[-train])-log.sal.pred)^2)
+rse=sqrt(mse)
+rse.converted=exp(rse)
+rse.converted
+plot(log.sal.pred,log(price[-train]))
+#MSE this model larger than in model of assignment #5
+```
+
+Question #19
+```{r}
+summary(house.gbm,n.trees=min.tree,las=1)
+#zipcode, grade, view
+plot(house.gbm, n.trees=min.tree, i="sqft_living")
+plot(house.gbm, n.trees=min.tree, i="grade")
+# more sqft_living more grade
+```
+

@@ -1,0 +1,146 @@
+---
+title: 'Assignment #3'
+author: "Nikita Sotnikov"
+date: "07 02 2021"
+output: html_document
+---
+Question 1
+```{r}
+Bank=read.csv("bank marketing.csv")
+attach(Bank)
+str(Bank)
+Bank$y=as.factor(Bank$y)
+class(Bank$y)
+```
+
+Question 2
+```{r}
+set.seed(10)
+bank.train=sample(nrow(Bank),nrow(Bank)/2)
+```
+
+Question 3
+```{r}
+bank.fit=glm(y~.-duration, data=Bank, family=binomial, subset=bank.train)
+summary(bank.fit)
+# In this model residual deviance 11128 and AIC is 11232 comparing with null deviance it is smaller that is good, also number of Fisher Scoring iterations is 9
+```
+
+Question 4
+```{r}
+bank.prob=predict(bank.fit, newdata=Bank[-bank.train,], type="response")
+```
+
+Question 5
+```{r}
+bank.pred=ifelse(bank.prob>0.5,"yes","no")
+```
+
+Question 6
+```{r}
+table(bank.pred, y[-bank.train])
+```
+
+Question 7
+```{r}
+sum(bank.pred!=y[-bank.train])/length(y[-bank.train]) # Overall error rate
+sum((bank.pred=="yes")&(y[-bank.train]=="no"))/sum(y[-bank.train]=="no") # Type I error rate
+sum((bank.pred=="no")&(y[-bank.train]=="yes"))/sum(y[-bank.train]=="yes") # Type II error rate
+```
+
+Question 8
+```{r}
+bank.pred=ifelse(bank.prob>0.1,"yes","no")
+table(bank.pred, y[-bank.train])
+sum(bank.pred!=y[-bank.train])/length(y[-bank.train]) # Overall error rate
+sum((bank.pred=="yes")&(y[-bank.train]=="no"))/sum(y[-bank.train]=="no") # Type I error rate
+sum((bank.pred=="no")&(y[-bank.train]=="yes"))/sum(y[-bank.train]=="yes") # Type II error rate
+```
+
+Question 9
+```{r}
+bank.pred=ifelse(bank.prob>0.05,"yes","no")
+table(bank.pred, y[-bank.train])
+sum(bank.pred!=y[-bank.train])/length(y[-bank.train]) # Overall error rate
+sum((bank.pred=="yes")&(y[-bank.train]=="no"))/sum(y[-bank.train]=="no") # Type I error rate
+sum((bank.pred=="no")&(y[-bank.train]=="yes"))/sum(y[-bank.train]=="yes") # Type II error rate
+```
+
+Question 10
+```{r}
+library(ROCR)
+rocplot=function(pred, truth, ...){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "tpr", "fpr")
+  plot(perf,...)}
+
+rocplot(bank.prob, y[-bank.train], col="black")
+
+auc=function(pred, truth){
+  predob=prediction(pred, truth)
+  perf=performance(predob, "auc")
+  return(perf@y.values[[1]])}
+
+auc(bank.prob, y[-bank.train])
+```
+
+Question 11
+```{r}
+#The closest one is probability>0.5 if we use a type of error analysis, other two not good for this ROC model. So first situation with threshold probabilities=0.5 is best.
+```
+
+Question 12
+```{r}
+library(MASS)
+bank.lda=lda(y~.-duration,data=Bank,subset=bank.train)
+bank.lpred=predict(bank.lda, Bank[-bank.train,])
+table(bank.lpred$class,y[-bank.train])
+sum(bank.lpred$class!=y[-bank.train])/length(y[-bank.train]) # Overall error rate
+sum((bank.lpred$class=="yes")&(y[-bank.train]=="no"))/sum(y[-bank.train]=="no") # Type I error rate
+sum((bank.lpred$class=="no")&(y[-bank.train]=="yes"))/sum(y[-bank.train]=="yes") # Type II error rate
+```
+
+Question 13
+```{r}
+rocplot(bank.lpred$posterior[,2], y[-bank.train])
+auc(bank.lpred$posterior[,2], y[-bank.train])
+```
+
+Question 14
+```{r}
+bank.qda=qda(y~.-duration -loan -default,data=Bank,subset=bank.train)
+bank.qpred=predict(bank.qda, Bank[-bank.train,])
+table(bank.qpred$class,y[-bank.train])
+sum(bank.qpred$class!=y[-bank.train])/length(y[-bank.train]) # Overall error rate
+sum((bank.qpred$class=="yes")&(y[-bank.train]=="no"))/sum(y[-bank.train]=="no") # Type I error rate
+sum((bank.qpred$class=="no")&(y[-bank.train]=="yes"))/sum(y[-bank.train]=="yes") # Type II error rate
+```
+
+Question 15
+```{r}
+rocplot(bank.qpred$posterior[,2], y[-bank.train])
+auc(bank.qpred$posterior[,2], y[-bank.train])
+```
+
+Question 16
+```{r}
+rocplot(bank.lpred$posterior[,2], y[-bank.train], col="red")
+legend(x=0.67, y=0.1,legend="LDA",col="red",lwd=1,bty="n")
+auc.lda=auc(bank.lpred$posterior[,2], y[-bank.train])
+auc.lda
+legend(x=0.85, y=0.1,legend=round(auc.lda,5),bty="n")
+
+rocplot(bank.qpred$posterior[,2], y[-bank.train], col="blue", add=T)
+legend(x=0.67, y=0.17,legend="QDA",col="blue",lwd=1,bty="n")
+auc.qda=auc(bank.qpred$posterior[,2], y[-bank.train])
+auc.qda
+legend(x=0.85, y=0.17,legend=round(auc.qda,5),bty="n")
+
+rocplot(bank.prob, y[-bank.train], col="green", add=T)
+legend(x=0.67, y=0.24,legend="logistic",col="green",lwd=1,bty="n")
+auc.log=auc(bank.prob, y[-bank.train])
+auc.log
+legend(x=0.85, y=0.24,legend=round(auc.log,5),bty="n")
+#The best model is logistic because have the biggest auc 0.78987, the second model LDA is good and have auc=0.78782 and last model is QDA, since have a smallest auc which is 0.77041
+```
+

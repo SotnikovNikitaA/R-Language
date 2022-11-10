@@ -1,0 +1,182 @@
+---
+title: 'Assignment #5'
+author: "Nikita Sotnikov"
+date: "26 02 2021"
+output: html_document
+---
+
+Question #1
+```{r}
+House=read.csv("kc house sales.csv")
+House$date=as.Date(House$date,format="%Y%m%d")
+House$view=as.factor(House$view)
+House$waterfront=as.factor(House$waterfront)
+House$zipcode=as.factor(House$zipcode)
+House[15871,3]=3
+attach(House)
+```
+
+Question #2
+```{r warning=FALSE}
+library(leaps)
+house.fit=regsubsets(log(price)~(.-sqft_basement-zipcode)^2+zipcode, data=House, method="forward")
+house.sum=summary(house.fit)
+house.sum$cp
+
+par(mfrow=c(1,3))
+plot(house.sum$cp,type="b")
+mincp=which.min(house.sum$cp)
+points(mincp,house.sum$cp[mincp],pch=4,cex=2,col=2)
+
+plot(house.sum$bic,type="b")
+minbic=which.min(house.sum$bic)
+points(minbic,house.sum$bic[minbic],pch=4,cex=2,col=2)
+```
+
+Question #3
+```{r}
+house.fit=regsubsets(log(price)~(.-sqft_basement-zipcode)^2+zipcode, data=House, method="backward")
+house.sum=summary(house.fit)
+house.sum$cp
+
+par(mfrow=c(1,3))
+plot(house.sum$cp,type="b")
+mincp=which.min(house.sum$cp)
+points(mincp,house.sum$cp[mincp],pch=4,cex=2,col=2)
+
+plot(house.sum$bic,type="b")
+minbic=which.min(house.sum$bic)
+points(minbic,house.sum$bic[minbic],pch=4,cex=2,col=2)
+
+```
+
+Question #4
+```{r}
+#Forward selection method is better because has a smaller min cp.
+```
+Question #5
+```{r}
+bwd.glm=glm(log(price)~.-sqft_basement+bedrooms:sqft_living+bedrooms:sqft_lot+bedrooms:floors+bedrooms:grade+bedrooms:sqft_above+bedrooms:long+bedrooms:sqft_lot15+bathrooms:sqft_lot+bathrooms:floors+bathrooms:sqft_above+bathrooms:yr_built+bathrooms:long+bathrooms:sqft_lot15+sqft_living:floors+sqft_living:sqft_above+sqft_living:yr_renovated+sqft_living:lat+sqft_living:long+sqft_living:sqft_living15+sqft_living:view+sqft_lot:yr_built+sqft_lot:sqft_lot15+floors:yr_built+floors:lat+condition:grade+condition:yr_built+condition:yr_renovated+condition:sqft_living+grade:long+grade:waterfront+sqft_above:yr_built+sqft_above:lat+yr_built:long+yr_built:sqft_living15+yr_renovated:lat+yr_renovated:view+lat:sqft_lot15+lat:waterfront+long:date+long:view+long:waterfront+view:waterfront, House, family=gaussian)
+bwd.glm$aic
+```
+Question #6
+```{r warning=FALSE}
+library(boot)
+set.seed(100)
+house.cvglm=cv.glm(House,bwd.glm, K=10)
+house.cvglm$delta
+```
+
+Question #7
+```{r}
+library(glmnet)
+x=model.matrix(log(price)~(.-sqft_basement-zipcode)^2+zipcode, data=House)[,-1]
+y=log(price)
+
+#ridge regression
+cv.out=cv.glmnet(x,y,alpha=0, labda=100)
+plot(cv.out)
+cv.out$lambda.min
+min.r=which.min(cv.out$cvm)
+cv.out$cvm[min.r]
+```
+
+Question #8
+```{r}
+#Lasso
+cv.out=cv.glmnet(x,y,alpha=1, labda=100)
+plot(cv.out)
+cv.out$lambda.min
+min.r=which.min(cv.out$cvm)
+cv.out$cvm[min.r]
+```
+
+Question #9
+
+#The first model have a smallest test MSE.
+
+Question #10
+```{r}
+library(splines)
+cv.error=rep(0, 10)
+set.seed(100)
+for (i in 1:25) {
+ns.fit=glm(log(price)~ns(sqft_living,df=i))
+cv.error[i]=cv.glm(House,ns.fit,K=10)$delta[1]
+}
+cv.error
+plot(cv.error, type="b")
+df.min=which.min(cv.error)
+points(df.min,cv.error[df.min],col=2,pch=4,cex=2)
+```
+
+Question #11
+```{r}
+ns.fit=glm(log(price)~ns(sqft_living,df=12))
+attr(ns(sqft_living,df=12),"knots")
+summary(ns.fit)
+#In this model residual deviance 3069.1 this is good, and aic is 19176 that's not very good, and Number of Fisher Scoring iteration is 2
+```
+
+Question #12
+```{r}
+sqftlims=range(sqft_living)
+sqftgrid=seq(sqftlims[1],sqftlims[2])
+ns.pred=predict(ns.fit,newdata=data.frame(sqft_living=sqftgrid), se=T)
+plot(sqft_living,log(price),col="grey")
+lines(sqftgrid,ns.pred$fit,lwd=2,col="red")
+```
+
+Question #13
+```{r warning=FALSE}
+ss.fit=smooth.spline(sqft_living,log(price),df=10)
+ss.fit2=smooth.spline(sqft_living,log(price),cv=T)
+ss.fit2$df
+plot(sqft_living,log(price),col="grey")
+lines(ss.fit,lwd=2)
+lines(ss.fit2,lwd=2,col="red")
+legend("topright",legend=c("10 DF","19 DF"),col=c("black", "red"),lwd=2)
+```
+
+Question #14
+```{r}
+ss.fit=smooth.spline(lat,log(price),df=10)
+ss.fit2=smooth.spline(lat,log(price),cv=T)
+ss.fit2$df
+plot(lat,log(price),col="grey")
+lines(ss.fit,lwd=2)
+lines(ss.fit2,lwd=2,col="red")
+legend("topright",legend=c("10 DF","9 DF"),col=c("black", "red"),lwd=2)
+```
+
+Question #15
+```{r}
+ss.fit=smooth.spline(long,log(price),df=15)
+ss.fit2=smooth.spline(long,log(price),cv=T)
+ss.fit2$df
+plot(long,log(price),col="grey")
+lines(ss.fit,lwd=2)
+lines(ss.fit2,lwd=2,col="red")
+legend("topright",legend=c("15 DF","5 DF"),col=c("black", "red"),lwd=2)
+```
+
+Question #16
+```{r}
+library(gam)
+gam.fit=gam(log(price)~.+ns(sqft_living,df=10)+s(lat,df=10)+s(long,df=15)-sqft_basement+bedrooms:sqft_living+bedrooms:sqft_lot+bedrooms:floors+bedrooms:grade+bedrooms:sqft_above+bedrooms:long+bedrooms:sqft_lot15+bathrooms:sqft_lot+bathrooms:floors+bathrooms:sqft_above+bathrooms:yr_built+bathrooms:long+bathrooms:sqft_lot15+sqft_living:floors+sqft_living:sqft_above+sqft_living:yr_renovated+sqft_living:lat+sqft_living:long+sqft_living:sqft_living15+sqft_living:view+sqft_lot:yr_built+sqft_lot:sqft_lot15+floors:yr_built+floors:lat+condition:grade+condition:yr_built+condition:yr_renovated+condition:sqft_living+grade:long+grade:waterfront+sqft_above:yr_built+sqft_above:lat+yr_built:long+yr_built:sqft_living15+yr_renovated:lat+yr_renovated:view+lat:sqft_lot15+lat:waterfront+long:date+long:view+long:waterfront+view:waterfront, data=House)
+gam.fit$aic
+# This model is better than model in question 5 because it is more negative.
+```
+Extra #1
+```{r warning=FALSE}
+set.seed(10)
+cv.error=rep(0, 10)
+for(i in 1:10){
+house.fit=glm(log(price)~.+ns(sqft_living,df=10)+s(lat,df=10)+s(long,df=15)-sqft_basement+bedrooms:sqft_living+bedrooms:sqft_lot+bedrooms:floors+bedrooms:grade+bedrooms:sqft_above+bedrooms:long+bedrooms:sqft_lot15+bathrooms:sqft_lot+bathrooms:floors+bathrooms:sqft_above+bathrooms:yr_built+bathrooms:long+bathrooms:sqft_lot15+sqft_living:floors+sqft_living:sqft_above+sqft_living:yr_renovated+sqft_living:lat+sqft_living:long+sqft_living:sqft_living15+sqft_living:view+sqft_lot:yr_built+sqft_lot:sqft_lot15+floors:yr_built+floors:lat+condition:grade+condition:yr_built+condition:yr_renovated+condition:sqft_living+grade:long+grade:waterfront+sqft_above:yr_built+sqft_above:lat+yr_built:long+yr_built:sqft_living15+yr_renovated:lat+yr_renovated:view+lat:sqft_lot15+lat:waterfront+long:date+long:view+long:waterfront+view:waterfront, data=House, family=gaussian)
+
+cv.error[i]=cv.glm(House,house.fit,K=10)$delta[1]
+}
+cv.error
+# This model has a smallest MSE with df=4, compare with other models, so this model is better.
+```
+
