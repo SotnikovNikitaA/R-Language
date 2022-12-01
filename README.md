@@ -4,4 +4,4 @@
 
 #### Description: These files are examples of data processing and the creation of forecasts in the form of visualizations.
 
-#### Commercial use: In business, it will help in making business decisions by displaying current data in the form of visualizations, as well as relevant data.
+#### Business use: In business, it will help in making business decisions by displaying current data in the form of visualizations, as well as relevant data.
